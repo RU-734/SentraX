@@ -4,6 +4,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+import AssetsPage from './pages/AssetsPage'; // Import AssetsPage
+import AddAssetPage from './pages/AddAssetPage'; // Import AddAssetPage
+import EditAssetPage from './pages/EditAssetPage'; // Import EditAssetPage
 import ProtectedRoute from './components/ProtectedRoute';
 import Button from './components/ui/Button'; // For the logout button
 
@@ -38,6 +41,9 @@ const AppContent: React.FC = () => {
                 <Link href="/dashboard" className="hover:text-gray-300">
                   Dashboard
                 </Link>
+                <Link href="/assets" className="hover:text-gray-300">
+                  Assets
+                </Link>
                 <Button
                   onClick={handleLogout}
                   className="bg-red-500 hover:bg-red-700 text-white"
@@ -71,6 +77,24 @@ const AppContent: React.FC = () => {
             <ProtectedRoute>
               <DashboardPage />
             </ProtectedRoute>
+          </Route>
+          <Route path="/assets">
+            <ProtectedRoute>
+              <AssetsPage />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/assets/new">
+            <ProtectedRoute>
+              <AddAssetPage />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/assets/edit/:assetId">
+            {(params) => ( // Wouter provides params directly to children function if path matches
+              <ProtectedRoute>
+                <EditAssetPage /> 
+                {/* EditAssetPage uses useRoute to get assetId, so no need to pass params explicitly here */}
+              </ProtectedRoute>
+            )}
           </Route>
           <Route path="/">
             {isLoading ? (

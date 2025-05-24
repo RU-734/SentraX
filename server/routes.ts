@@ -1,11 +1,15 @@
 import express, { Router, Request, Response } from 'express';
 
 import authRouter from './auth'; // Import the authentication router
+import assetsRouter from './assets'; // Import the assets router
 
 const router: Router = express.Router();
 
 // Mount authentication routes
 router.use('/auth', authRouter);
+
+// Mount assets routes
+router.use('/assets', assetsRouter);
 
 // Example API route
 router.get('/hello', (req: Request, res: Response) => {
