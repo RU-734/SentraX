@@ -1,4 +1,4 @@
-import { pgTable, serial, text, pgEnum, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, pgEnum, timestamp, decimal, integer, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // Define an enum for user roles
 export const userRoleEnum = pgEnum('user_role', ['admin', 'user']);
@@ -38,6 +38,62 @@ export const assets = pgTable('assets', {
   // If you were to add a userId foreign key:
   // userId: integer('user_id').references(() => users.id),
 });
+
+// --- Vulnerability Schemas ---
+
+// 1. Vulnerability Severity Enum
+export const vulnerabilitySeverityEnum = pgEnum('vulnerability_severity', [
+  'critical',
+  'high',
+  'medium',
+  'low',
+  'informational',
+]);
+
+// 2. Vulnerabilities Table
+export const vulnerabilities = pgTable('vulnerabilities', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull().unique(),
+  description: text('description').notNull(),
+  severity: vulnerabilitySeverityEnum('severity').notNull(),
+  cvssScore: decimal('cvss_score', { precision: 3, scale: 1 }), // Optional
+  references: text('references').array(), // Optional
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+// 3. Vulnerability Status Enum
+export const vulnerabilityStatusEnum = pgEnum('vulnerability_status', [
+  'open',
+  'remediated',
+  'ignored',
+  'pending_verification',
+]);
+
+// 4. Assets-Vulnerabilities Join Table (Link Table)
+export const assets_vulnerabilities = pgTable('assets_vulnerabilities', {
+  id: serial('id').primaryKey(), // Optional, but can be useful
+  assetId: integer('asset_id').notNull().references(() => assets.id, { onDelete: 'cascade' }),
+  vulnerabilityId: integer('vulnerability_id').notNull().references(() => vulnerabilities.id, { onDelete: 'cascade' }),
+  status: vulnerabilityStatusEnum('status').notNull().default('open'),
+  lastSeenAt: timestamp('last_seen_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
+  details: text('details'), // Optional, specific notes
+  remediationNotes: text('remediation_notes'), // Optional
+  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+}, (table) => {
+  return {
+    // Define a composite unique constraint on assetId and vulnerabilityId
+    assetVulnerabilityUnique: uniqueIndex('asset_vulnerability_unique_idx').on(table.assetId, table.vulnerabilityId),
+    // Drizzle also supports `primaryKey` for composite PKs if `id` was not used:
+    // assetVulnerabilityPk: primaryKey(table.assetId, table.vulnerabilityId),
+  };
+});
+
 
 // You can define more tables here as your application grows
 // For example:
