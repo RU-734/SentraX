@@ -1,6 +1,11 @@
 import express, { Router, Request, Response } from 'express';
 
+import authRouter from './auth'; // Import the authentication router
+
 const router: Router = express.Router();
+
+// Mount authentication routes
+router.use('/auth', authRouter);
 
 // Example API route
 router.get('/hello', (req: Request, res: Response) => {

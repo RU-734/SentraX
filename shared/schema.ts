@@ -1,10 +1,15 @@
-import { pgTable, serial, text, varchar } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, pgEnum } from 'drizzle-orm/pg-core';
 
-// Example User table
+// Define an enum for user roles
+export const userRoleEnum = pgEnum('user_role', ['admin', 'user']);
+
+// Updated User table
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  fullName: text('full_name'),
-  email: varchar('email', { length: 256 }).unique(),
+  username: text('username').unique().notNull(),
+  email: text('email').unique().notNull(),
+  passwordHash: text('password_hash').notNull(),
+  role: userRoleEnum('role').default('user').notNull(),
 });
 
 // You can define more tables here as your application grows
@@ -18,7 +23,4 @@ export const users = pgTable('users', {
 // });
 
 // Example an enum type
-// import { pgEnum } from 'drizzle-orm/pg-core';
-// export const userRoleEnum = pgEnum('user_role', ['admin', 'editor', 'viewer']);
-// ... and then in a table:
-// role: userRoleEnum('user_role').default('viewer'),
+// ... (this comment block can remain or be cleaned up later if desired)
