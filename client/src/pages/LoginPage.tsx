@@ -1,5 +1,16 @@
 import React, { useState, FormEvent } from 'react';
-import Button from '../components/ui/Button'; // Assuming Button.tsx is in this path
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardFooter, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card';
+import { Link } from 'wouter'; // For "Don't have an account?" link
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState<string>('');
@@ -10,6 +21,7 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
+    if (loading) return; // Prevent multiple submissions
     setLoading(true);
     setError(null);
     // setSuccessMessage(null);
@@ -43,67 +55,63 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold text-center text-gray-800">Login</h2>
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div>
-            <label
-              htmlFor="username"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Username
-            </label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              autoComplete="username"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Your username"
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="block w-full px-3 py-2 mt-1 text-gray-900 placeholder-gray-500 border border-gray-300 rounded-md shadow-sm appearance-none focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Your password"
-            />
-          </div>
+    <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900 px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl font-bold">Login</CardTitle>
+          <CardDescription>
+            Enter your username and password to access your account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Your username"
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Your password"
+                disabled={loading}
+              />
+            </div>
 
-          {error && (
-            <p className="text-sm text-red-600 text-center">{error}</p>
-          )}
-          {/* {successMessage && (
-            <p className="text-sm text-green-600 text-center">{successMessage}</p>
-          )} */}
-
-          <div>
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
+            {error && (
+              <p className="text-sm text-red-600 text-center pt-2">{error}</p>
+            )}
+            
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Logging in...' : 'Login'}
             </Button>
-          </div>
-        </form>
-      </div>
+          </form>
+        </CardContent>
+        <CardFooter className="flex flex-col items-center space-y-2 text-sm">
+          <p>
+            Don't have an account?{' '}
+            <Link href="/register" className="font-medium text-primary hover:underline underline-offset-4">
+              Register
+            </Link>
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   );
 };
