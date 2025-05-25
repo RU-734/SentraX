@@ -2,8 +2,23 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: ["class"],
-  content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
+  content: [
+    "./client/index.html", 
+    "./client/src/**/*.{js,jsx,ts,tsx}",
+    // Standard shadcn/ui paths, adjust if your project structure is different
+    './app/pages/**/*.{ts,tsx}',
+    './app/components/**/*.{ts,tsx}',
+    './app/src/**/*.{ts,tsx}',
+  ],
+  prefix: "", // Often added by shadcn/ui, can be empty
   theme: {
+    container: { // Added by shadcn/ui
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
     extend: {
       borderRadius: {
         lg: "var(--radius)",

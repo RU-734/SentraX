@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from 'react';
-import Button from '../components/ui/Button'; // Assuming Button.tsx is in this path
+import { Button } from '@/components/ui/button'; // Updated import for shadcn/ui button
 
 const RegisterPage: React.FC = () => {
   const [username, setUsername] = useState<string>('');
