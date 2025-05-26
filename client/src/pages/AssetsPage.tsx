@@ -77,6 +77,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
   'remediated',
   'ignored',
   'pending_verification',
+  'archived',
 ];
 
 
