@@ -92,6 +92,7 @@ describe('Asset API (/api/assets)', () => {
       { method: 'get', path: '/api/assets/1' }, // Assuming 1 is a placeholder ID
       { method: 'put', path: '/api/assets/1' },
       { method: 'delete', path: '/api/assets/1' },
+      { method: 'post', path: '/api/assets/1/scan' }, // Added scan endpoint
     ];
 
     endpoints.forEach(endpoint => {
@@ -103,8 +104,8 @@ describe('Asset API (/api/assets)', () => {
   });
 
   describe('POST /api/assets (Create Asset)', () => {
-    it('should create a new asset successfully', async () => {
-      const assetData = getSampleAssetData('create_success');
+    it('should create a new asset successfully (without lastScannedAt)', async () => {
+      const assetData = getSampleAssetData('create_success_no_scan');
       const response = await agent
         .post('/api/assets')
         .send(assetData)
@@ -115,6 +116,42 @@ describe('Asset API (/api/assets)', () => {
       expect(response.body.name).toBe(assetData.name);
       expect(response.body.type).toBe(assetData.type);
       expect(response.body.ipAddress).toBe(assetData.ipAddress);
+      expect(response.body.lastScannedAt).toBeNull();
+
+      // Verify in DB
+      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, createdAssetId as number) });
+      expect(dbAsset?.lastScannedAt).toBeNull();
+    });
+    
+    it('should create a new asset successfully with a valid lastScannedAt', async () => {
+      const scanDate = new Date(Date.now() - 24 * 60 * 60 * 1000); // Yesterday
+      const assetData = { ...getSampleAssetData('create_with_scan'), lastScannedAt: scanDate.toISOString() };
+      const response = await agent
+        .post('/api/assets')
+        .send(assetData)
+        .expect(201);
+
+      expect(response.body.id).toBeDefined();
+      createdAssetId = response.body.id;
+      expect(response.body.lastScannedAt).toBeDefined();
+      // Compare date parts, ignoring potential microsecond differences if DB truncates/rounds
+      expect(new Date(response.body.lastScannedAt).toISOString().split('.')[0]) 
+        .toBe(scanDate.toISOString().split('.')[0]);
+      
+      // Verify in DB
+      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, createdAssetId as number) });
+      expect(dbAsset?.lastScannedAt).toBeDefined();
+      expect(dbAsset?.lastScannedAt?.toISOString().split('.')[0])
+        .toBe(scanDate.toISOString().split('.')[0]);
+    });
+    
+    it('should fail to create an asset with an invalid lastScannedAt date string', async () => {
+      const assetData = { ...getSampleAssetData('create_invalid_scan'), lastScannedAt: 'not-a-date' };
+      const response = await agent
+        .post('/api/assets')
+        .send(assetData)
+        .expect(400);
+      expect(response.body.message).toBe('Invalid lastScannedAt date format.');
     });
 
     it('should fail to create an asset with missing required fields (name)', async () => {
@@ -201,7 +238,7 @@ describe('Asset API (/api/assets)', () => {
         createdAssetId = tempAssetId; // Ensure it's cleaned up
     });
 
-    it('should successfully update an existing asset', async () => {
+    it('should successfully update an existing asset (name and type)', async () => {
       const updatedData = { name: 'Updated Asset Name', type: 'workstation' as const };
       const response = await agent
         .put(`/api/assets/${tempAssetId}`)
@@ -210,6 +247,59 @@ describe('Asset API (/api/assets)', () => {
       expect(response.body.name).toBe(updatedData.name);
       expect(response.body.type).toBe(updatedData.type);
       expect(response.body.ipAddress).toBe(initialAssetData.ipAddress); // Unchanged field
+      // lastScannedAt should remain as it was (null in this case, as initialAssetData doesn't set it)
+      const dbAssetInitial = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, tempAssetId) });
+      expect(dbAssetInitial?.lastScannedAt).toBeNull(); // Assuming initialAssetData doesn't have lastScannedAt
+    });
+    
+    it('should successfully update lastScannedAt to a new valid date', async () => {
+      const newScanDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); // Two days ago
+      const updatedData = { lastScannedAt: newScanDate.toISOString() };
+      const response = await agent
+        .put(`/api/assets/${tempAssetId}`)
+        .send(updatedData)
+        .expect(200);
+      expect(response.body.lastScannedAt).toBeDefined();
+      expect(new Date(response.body.lastScannedAt).toISOString().split('.')[0])
+        .toBe(newScanDate.toISOString().split('.')[0]);
+       // Verify in DB
+      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, tempAssetId) });
+      expect(dbAsset?.lastScannedAt?.toISOString().split('.')[0])
+        .toBe(newScanDate.toISOString().split('.')[0]);
+    });
+
+    it('should successfully update lastScannedAt to null', async () => {
+      // First, set a lastScannedAt date
+      const initialScanDate = new Date();
+      await agent.put(`/api/assets/${tempAssetId}`).send({ lastScannedAt: initialScanDate.toISOString() }).expect(200);
+      
+      // Now, update it to null
+      const updatedData = { lastScannedAt: null };
+      const response = await agent
+        .put(`/api/assets/${tempAssetId}`)
+        .send(updatedData)
+        .expect(200);
+      expect(response.body.lastScannedAt).toBeNull();
+      // Verify in DB
+      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, tempAssetId) });
+      expect(dbAsset?.lastScannedAt).toBeNull();
+    });
+
+    it('should fail to update lastScannedAt with an invalid date string', async () => {
+      const updatedData = { lastScannedAt: 'not-a-valid-date' };
+      const response = await agent
+        .put(`/api/assets/${tempAssetId}`)
+        .send(updatedData)
+        .expect(400);
+      expect(response.body.message).toBe('Invalid lastScannedAt date format.');
+    });
+    
+    it('should not update any field if an empty body is sent and return 400', async () => {
+        const response = await agent
+            .put(`/api/assets/${tempAssetId}`)
+            .send({}) // Empty body
+            .expect(400); 
+        expect(response.body.message).toBe('No fields provided for update.');
     });
 
     it('should return 404 when trying to update a non-existent asset', async () => {
@@ -246,5 +336,57 @@ describe('Asset API (/api/assets)', () => {
     it('should return 404 when trying to delete a non-existent asset', async () => {
       await agent.delete('/api/assets/999999').expect(404);
     });
+    
+    it('should return 400 for an invalid ID format (non-numeric)', async () => {
+        await agent.delete('/api/assets/invalidID').expect(400);
+    });
+  });
+
+  // --- Tests for POST /api/assets/:assetId/scan ---
+  describe('POST /api/assets/:assetId/scan (Scan Asset)', () => {
+    let tempAssetId: number;
+    const isRecent = (dateString: string | null | undefined, deltaSeconds = 5) => {
+        if (!dateString) return false;
+        const date = new Date(dateString);
+        const now = new Date();
+        return Math.abs(now.getTime() - date.getTime()) < deltaSeconds * 1000;
+    };
+
+    beforeEach(async () => {
+      const assetData = getSampleAssetData('scan_target');
+      const res = await agent.post('/api/assets').send(assetData).expect(201);
+      tempAssetId = res.body.id;
+      createdAssetId = tempAssetId; // Ensure cleanup
+    });
+
+    it('should successfully scan an asset and update lastScannedAt', async () => {
+      const response = await agent
+        .post(`/api/assets/${tempAssetId}/scan`)
+        .send() // No body needed
+        .expect(200);
+
+      expect(response.body.id).toBe(tempAssetId);
+      expect(response.body.lastScannedAt).toBeDefined();
+      expect(isRecent(response.body.lastScannedAt)).toBe(true);
+
+      // Verify in DB
+      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, tempAssetId) });
+      expect(dbAsset).toBeDefined();
+      expect(dbAsset?.lastScannedAt).toBeDefined();
+      expect(isRecent(dbAsset?.lastScannedAt?.toISOString())).toBe(true);
+    });
+
+    it('should return 404 when trying to scan a non-existent asset', async () => {
+      await agent.post('/api/assets/999999/scan').send().expect(404);
+    });
+
+    it('should return 400 for an invalid asset ID format (non-numeric)', async () => {
+      await agent.post('/api/assets/invalidID/scan').send().expect(400);
+    });
+
+    // Unauthenticated test is covered by the Authentication Checks describe block
+    // it('should return 401 if not authenticated', async () => {
+    //   await request(app).post(`/api/assets/${tempAssetId}/scan`).send().expect(401);
+    // });
   });
 });

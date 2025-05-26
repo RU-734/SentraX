@@ -1,5 +1,6 @@
 import React, { useState, useEffect, FormEvent } from 'react';
 import Button from '../ui/Button'; // Assuming Button.tsx is in client/src/components/ui/
+import { format } from 'date-fns';
 
 // Define the Asset interface (can be moved to a shared types file later)
 export interface Asset {
@@ -12,9 +13,10 @@ export interface Asset {
   description?: string | null;
   createdAt?: string; // Optional in form, set by backend
   updatedAt?: string; // Optional in form, set by backend
+  lastScannedAt?: string | null;
 }
 
-// FormData will not include id, createdAt, updatedAt as these are managed by backend/DB
+// FormData will not include id, createdAt, updatedAt, lastScannedAt as these are managed by backend/DB or for display only
 export type AssetFormData = Omit<Asset, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface AssetFormProps {
@@ -69,12 +71,27 @@ const AssetForm: React.FC<AssetFormProps> = ({
       macAddress: macAddress || null, // Ensure empty strings become null if backend expects null
       operatingSystem: operatingSystem || null,
       description: description || null,
+      // lastScannedAt is not part of AssetFormData
     };
     await onSubmit(formData);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 p-6 bg-white shadow-md rounded-lg">
+      {isEditing && initialData?.lastScannedAt && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-md border border-gray-200">
+          <p className="text-sm font-medium text-gray-700">Last Scanned At:</p>
+          <p className="text-sm text-gray-600">
+            {format(new Date(initialData.lastScannedAt), 'Pp')}
+          </p>
+        </div>
+      )}
+       {isEditing && initialData && !initialData.lastScannedAt && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-md border border-gray-200">
+          <p className="text-sm font-medium text-gray-700">Last Scanned At:</p>
+          <p className="text-sm text-gray-600">N/A</p>
+        </div>
+      )}
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name <span className="text-red-500">*</span></label>
         <input
