@@ -30,6 +30,7 @@ export const assets = pgTable('assets', {
   macAddress: text('mac_address'), // Optional
   operatingSystem: text('operating_system'), // Optional
   description: text('description'), // Optional
+  lastScannedAt: timestamp('last_scanned_at', { mode: 'date', withTimezone: true }),
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
     .defaultNow()
