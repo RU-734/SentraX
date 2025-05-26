@@ -70,6 +70,7 @@ export const vulnerabilityStatusEnum = pgEnum('vulnerability_status', [
   'remediated',
   'ignored',
   'pending_verification',
+  'archived',
 ]);
 
 // 4. Assets-Vulnerabilities Join Table (Link Table)
