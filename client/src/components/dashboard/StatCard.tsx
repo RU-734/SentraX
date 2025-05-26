@@ -1,4 +1,10 @@
 import React from 'react';
+import { 
+  Card, 
+  CardContent, 
+  CardHeader, 
+  CardTitle 
+} from '@/components/ui/card'; // Import shadcn/ui Card components
 
 interface StatCardProps {
   title: string;
@@ -14,23 +20,26 @@ const StatCard: React.FC<StatCardProps> = ({
   value, 
   icon, 
   className = '',
-  valueClassName = 'text-3xl font-bold text-gray-800',
-  titleClassName = 'text-sm font-medium text-gray-500 truncate'
+  valueClassName = 'text-2xl font-bold', // Adjusted default to text-2xl as per common stat card examples
+  titleClassName = 'text-sm font-medium text-muted-foreground' // Using muted-foreground for title
 }) => {
   return (
-    <div className={`bg-white shadow-lg rounded-xl p-5 ${className}`}>
-      <div className="flex items-center space-x-4">
-        {icon && <div className="flex-shrink-0">{icon}</div>}
-        <div className="flex-1 min-w-0">
-          <p className={titleClassName}>
-            {title}
-          </p>
-          <p className={valueClassName}>
-            {value}
-          </p>
+    <Card className={className}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className={titleClassName}>
+          {title}
+        </CardTitle>
+        {icon && <div className="text-muted-foreground">{icon}</div>} 
+        {/* Icon can be styled further if needed */}
+      </CardHeader>
+      <CardContent>
+        {/* The prompt example has value directly in CardContent, often within a div for styling */}
+        <div className={valueClassName}>
+          {value}
         </div>
-      </div>
-    </div>
+        {/* If there were other elements like percentage change, they'd go here */}
+      </CardContent>
+    </Card>
   );
 };
 
