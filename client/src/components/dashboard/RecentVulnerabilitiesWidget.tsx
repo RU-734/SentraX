@@ -1,5 +1,19 @@
 import React from 'react';
 import { Link } from 'wouter';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Matching the interface from DashboardPage.tsx
 interface RecentVulnerabilityInstance {
@@ -20,8 +34,8 @@ interface RecentVulnerabilitiesWidgetProps {
 }
 
 const severityColorMap: { [key: string]: string } = {
-  critical: 'text-red-600',
-  high: 'text-orange-500',
+  critical: 'text-red-600 font-semibold',
+  high: 'text-orange-500 font-semibold',
   medium: 'text-yellow-600',
   low: 'text-blue-500',
   informational: 'text-gray-500',
@@ -33,39 +47,50 @@ const RecentVulnerabilitiesWidget: React.FC<RecentVulnerabilitiesWidgetProps> = 
   error,
 }) => {
   return (
-    <div className="bg-white shadow-lg rounded-xl p-6">
-      <h3 className="text-xl font-semibold text-gray-800 mb-4">Recently Active Vulnerabilities</h3>
-      {isLoading && <p className="text-gray-500">Loading recent vulnerabilities...</p>}
-      {error && <p className="text-red-500">Error: {error}</p>}
-      {!isLoading && !error && (
-        vulnerabilities.length === 0 ? (
-          <p className="text-gray-500">No recently active open vulnerabilities found.</p>
-        ) : (
-          <ul className="space-y-3">
-            {vulnerabilities.map(vuln => (
-              <li key={vuln.joinId} className="p-3 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <div className="mb-2 sm:mb-0">
-                    <p className="text-sm font-medium text-gray-900">{vuln.vulnerabilityName}</p>
-                    <p className={`text-xs font-semibold ${severityColorMap[vuln.vulnerabilitySeverity?.toLowerCase()] || 'text-gray-600'}`}>
-                      Severity: {vuln.vulnerabilitySeverity || 'N/A'}
-                    </p>
-                  </div>
-                  <div className="text-sm text-gray-600 sm:text-right">
-                    <p>
-                      On Asset: <Link href="/assets" className="text-indigo-600 hover:text-indigo-800">{vuln.assetName}</Link>
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Last Active: {new Date(vuln.lastSeenOrUpdatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )
-      )}
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-xl">Recently Active Vulnerabilities</CardTitle>
+        {/* Optional: <CardDescription>Top 5 most recent open vulnerability instances.</CardDescription> */}
+      </CardHeader>
+      <CardContent>
+        {isLoading && <p className="text-sm text-muted-foreground">Loading recent vulnerabilities...</p>}
+        {error && <p className="text-sm text-red-500">Error: {error}</p>}
+        {!isLoading && !error && (
+          vulnerabilities.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No recently active open vulnerabilities found.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vulnerability</TableHead>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Asset</TableHead>
+                  <TableHead className="text-right">Last Active</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vulnerabilities.map(vuln => (
+                  <TableRow key={vuln.joinId}>
+                    <TableCell className="font-medium">{vuln.vulnerabilityName}</TableCell>
+                    <TableCell className={severityColorMap[vuln.vulnerabilitySeverity?.toLowerCase()] || 'text-gray-600'}>
+                      {vuln.vulnerabilitySeverity || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/assets`} className="hover:underline text-primary">
+                        {vuln.assetName}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {new Date(vuln.lastSeenOrUpdatedAt).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
