@@ -36,6 +36,7 @@ interface LinkedVulnerability {
     references?: string[] | null;
     createdAt: string; // from the vulnerabilities table
     updatedAt: string; // from the vulnerabilities table
+    source?: string | null; // Added source field
   } | null;
 }
 
@@ -372,6 +373,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                                     <tr>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Name</th>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Severity</th>
+                                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Source</th>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Last Seen</th>
                                     </tr>
@@ -382,6 +384,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                                         <tr className="hover:bg-gray-50">
                                           <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{link.vulnerability?.name || 'N/A'}</td>
                                           <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{link.vulnerability?.severity || 'N/A'}</td>
+                                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{link.vulnerability?.source || 'N/A'}</td>
                                           <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600">
                                             <select
                                               value={link.status}
@@ -400,7 +403,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                                         </tr>
                                         {updateStatusError[link.joinId] && (
                                             <tr>
-                                                <td colSpan={4} className="px-4 py-1 text-xs text-red-600 text-center">
+                                                <td colSpan={5} className="px-4 py-1 text-xs text-red-600 text-center"> {/* Colspan updated */}
                                                     Error updating status: {updateStatusError[link.joinId]}
                                                 </td>
                                             </tr>

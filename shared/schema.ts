@@ -58,6 +58,7 @@ export const vulnerabilities = pgTable('vulnerabilities', {
   description: text('description').notNull(),
   severity: vulnerabilitySeverityEnum('severity').notNull(),
   cvssScore: decimal('cvss_score', { precision: 3, scale: 1 }), // Optional
+  source: text('source'), // Optional
   references: text('references').array(), // Optional
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
