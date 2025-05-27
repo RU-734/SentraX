@@ -76,6 +76,7 @@ router.get('/recent-vulnerabilities', async (req: Request, res: Response) => {
         joinId: assetVulnerabilitiesTable.id,
         vulnerabilityName: vulnerabilitiesTable.name,
         vulnerabilitySeverity: vulnerabilitiesTable.severity,
+        vulnerabilitySource: vulnerabilitiesTable.source, // Added source field
         assetName: assetsTable.name,
         assetIpAddress: assetsTable.ipAddress,
         lastSeenOrUpdatedAt: assetVulnerabilitiesTable.updatedAt, // Using updatedAt from the join table
