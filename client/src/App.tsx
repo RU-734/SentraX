@@ -7,8 +7,6 @@ import DashboardPage from './pages/DashboardPage';
 import AssetsPage from './pages/AssetsPage'; // Import AssetsPage
 import AddAssetPage from './pages/AddAssetPage'; // Import AddAssetPage
 import EditAssetPage from './pages/EditAssetPage'; // Import EditAssetPage
-import AddVulnerabilityPage from './pages/AddVulnerabilityPage'; // Import AddVulnerabilityPage
-import EditVulnerabilityPage from './pages/EditVulnerabilityPage'; // Import EditVulnerabilityPage
 import ProtectedRoute from './components/ProtectedRoute';
 import Button from './components/ui/Button'; // For the logout button
 
@@ -93,21 +91,10 @@ const AppContent: React.FC = () => {
           <Route path="/assets/edit/:assetId">
             {(params) => ( // Wouter provides params directly to children function if path matches
               <ProtectedRoute>
-                <EditAssetPage /> 
+                <EditAssetPage />
                 {/* EditAssetPage uses useRoute to get assetId, so no need to pass params explicitly here */}
               </ProtectedRoute>
             )}
-          </Route>
-          <Route path="/vulnerabilities/new">
-            <ProtectedRoute>
-              <AddVulnerabilityPage />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/vulnerabilities/:id/edit">
-             {/* EditVulnerabilityPage uses useRoute to get ID, so no need to pass params explicitly here */}
-            <ProtectedRoute>
-              <EditVulnerabilityPage />
-            </ProtectedRoute>
           </Route>
           <Route path="/">
             {isLoading ? (

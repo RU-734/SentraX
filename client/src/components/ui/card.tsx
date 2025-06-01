@@ -34,7 +34,7 @@ const CardTitle = React.forwardRef<
   React.HTMLAttributes<HTMLHeadingElement> // More semantic for a title, but div is what shadcn shows in changelog
 >(({ className, ...props }, ref) => (
   // Using div as per the changelog snippet from the docs for CardTitle
-  <div 
+  <div
     ref={ref}
     className={cn("text-lg font-semibold leading-none tracking-tight", className)} // text-lg to be more title-like than default p
     {...props}

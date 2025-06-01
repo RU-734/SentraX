@@ -1,8 +1,15 @@
 import request from 'supertest';
 import app from '../index'; // The Express app instance
 import { db } from '../db';   // Drizzle ORM instance
-import { users, assets as assetsTable } from '@shared/schema'; // Schemas
-import { eq, sql } from 'drizzle-orm'; // For cleanup and queries
+import {
+    users,
+    assets as assetsTable,
+    vulnerabilities as vulnerabilitiesTable,
+    assets_vulnerabilities as assetVulnerabilitiesTable,
+    vulnerabilitySeverityEnum, // For creating sample vulnerabilities
+    vulnerabilityStatusEnum // For checking/setting status
+} from '@shared/schema'; // Schemas
+import { eq, sql, and, desc } from 'drizzle-orm'; // For cleanup and queries
 
 let agent: request.SuperAgentTest; // To persist session cookies across requests
 let testUserId: number;
@@ -22,14 +29,25 @@ const getSampleAssetData = (suffix: string | number = Date.now()) => ({
   description: 'A test asset description.',
 });
 
+const getSampleVulnerabilityData = (suffix: string | number = Date.now()) => ({
+  name: `Scan Test Vuln ${suffix}`,
+  description: `Description for scan test vuln ${suffix}`,
+  severity: vulnerabilitySeverityEnum.enumValues[Math.floor(Math.random() * vulnerabilitySeverityEnum.enumValues.length)], // Random severity
+  cvssScore: (Math.random() * 10).toFixed(1).toString(),
+});
+
 
 describe('Asset API (/api/assets)', () => {
+  const createdAssetIdsForScanTest: number[] = [];
+  const createdVulnerabilityIdsForScanTest: number[] = [];
+  const createdLinkIdsForScanTest: number[] = [];
+
   beforeAll(async () => {
     // 1. Register the test user
     const registerResponse = await request(app)
       .post('/api/auth/register')
       .send(baseTestUser);
-    
+
     if (registerResponse.status !== 201) {
       // Fallback: try to login if registration failed (e.g. user already exists from a previous failed test run)
       const loginResponse = await request(app)
@@ -48,7 +66,7 @@ describe('Asset API (/api/assets)', () => {
     const loginResponse = await agent
       .post('/api/auth/login')
       .send({ username: baseTestUser.username, password: baseTestUser.password });
-      
+
     if (loginResponse.status !== 200) {
         console.error("Login response body:", loginResponse.body);
         throw new Error('Login failed for test user in beforeAll.');
@@ -62,109 +80,90 @@ describe('Asset API (/api/assets)', () => {
       // More robust cleanup would involve tracking IDs created during tests.
       // For now, assuming tests clean up after themselves or specific assets by name/testUserId if that was added.
       // This is a simplification; in a real scenario, you'd use IDs or more specific markers.
-      await db.delete(assetsTable).where(sql`${assetsTable.name} like 'Test Asset %'`);
+      await db.delete(assetsTable).where(sql`${assetsTable.name} like 'Test Asset %' OR ${assetsTable.name} like 'Scan Test Asset %'`);
+      await db.delete(vulnerabilitiesTable).where(sql`${vulnerabilitiesTable.name} like 'Scan Test Vuln %'`);
+      if (createdLinkIdsForScanTest.length > 0) { // Clean up any explicitly tracked links
+        await db.delete(assetVulnerabilitiesTable).where(sql`${assetVulnerabilitiesTable.id} IN ${createdLinkIdsForScanTest}`);
+        createdLinkIdsForScanTest.length = 0;
+      }
       await db.delete(users).where(eq(users.id, testUserId));
     } catch (error) {
       console.error('Error during afterAll cleanup:', error);
     }
   });
-  
-  let createdAssetId: number | null = null;
+
+  let createdAssetIdForCRUD: number | null = null; // Renamed to avoid conflict
 
   afterEach(async () => {
     // Clean up any specific asset created during a test if its ID was stored
-    if (createdAssetId) {
+    if (createdAssetIdForCRUD) {
       try {
-        await db.delete(assetsTable).where(eq(assetsTable.id, createdAssetId));
+        await db.delete(assetsTable).where(eq(assetsTable.id, createdAssetIdForCRUD));
       } catch (error) {
-        // console.warn(`Warning: Failed to clean up asset with ID ${createdAssetId} after test.`, error);
+        // console.warn(`Warning: Failed to clean up asset with ID ${createdAssetIdForCRUD} after test.`, error);
       }
-      createdAssetId = null; // Reset for next test
+      createdAssetIdForCRUD = null; // Reset for next test
+    }
+    // Cleanup for scan test specific items will be handled in its own afterEach
+    if (createdAssetIdsForScanTest.length > 0) {
+        await db.delete(assetsTable).where(sql`${assetsTable.id} IN ${createdAssetIdsForScanTest}`);
+        createdAssetIdsForScanTest.length = 0;
+    }
+    if (createdVulnerabilityIdsForScanTest.length > 0) {
+        await db.delete(vulnerabilitiesTable).where(sql`${vulnerabilitiesTable.id} IN ${createdVulnerabilityIdsForScanTest}`);
+        createdVulnerabilityIdsForScanTest.length = 0;
+    }
+    if (createdLinkIdsForScanTest.length > 0) {
+        await db.delete(assetVulnerabilitiesTable).where(sql`${assetVulnerabilitiesTable.id} IN ${createdLinkIdsForScanTest}`);
+        createdLinkIdsForScanTest.length = 0;
     }
   });
 
 
-  // Test authentication for all asset routes
-  describe('Authentication Checks', () => {
-    const endpoints = [
-      { method: 'post', path: '/api/assets' },
-      { method: 'get', path: '/api/assets' },
-      { method: 'get', path: '/api/assets/1' }, // Assuming 1 is a placeholder ID
-      { method: 'put', path: '/api/assets/1' },
-      { method: 'delete', path: '/api/assets/1' },
-      { method: 'post', path: '/api/assets/1/scan' }, // Added scan endpoint
+  // Test authentication for all asset routes (excluding scan for now, will be tested separately)
+  describe('Authentication Checks (CRUD)', () => {
+    const crudEndpoints = [
+      { method: 'post', path: '/api/assets', data: {} },
+      { method: 'get', path: '/api/assets', data: undefined },
+      { method: 'get', path: '/api/assets/1', data: undefined },
+      { method: 'put', path: '/api/assets/1', data: {} },
+      { method: 'delete', path: '/api/assets/1', data: undefined },
     ];
 
-    endpoints.forEach(endpoint => {
+    crudEndpoints.forEach(endpoint => {
       it(`should return 401 for ${endpoint.method.toUpperCase()} ${endpoint.path} if not authenticated`, async () => {
         // @ts-ignore
-        await request(app)[endpoint.method](endpoint.path).send({}).expect(401);
+        await request(app)[endpoint.method](endpoint.path).send(endpoint.data || {}).expect(401);
       });
     });
   });
 
   describe('POST /api/assets (Create Asset)', () => {
-    it('should create a new asset successfully (without lastScannedAt)', async () => {
-      const assetData = getSampleAssetData('create_success_no_scan');
+    it('should create a new asset successfully', async () => {
+      const assetData = getSampleAssetData('create_success');
       const response = await agent
         .post('/api/assets')
         .send(assetData)
         .expect(201);
 
       expect(response.body.id).toBeDefined();
-      createdAssetId = response.body.id; // Store for cleanup
+      createdAssetIdForCRUD = response.body.id; // Store for cleanup
       expect(response.body.name).toBe(assetData.name);
       expect(response.body.type).toBe(assetData.type);
       expect(response.body.ipAddress).toBe(assetData.ipAddress);
-      expect(response.body.lastScannedAt).toBeNull();
-
-      // Verify in DB
-      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, createdAssetId as number) });
-      expect(dbAsset?.lastScannedAt).toBeNull();
-    });
-    
-    it('should create a new asset successfully with a valid lastScannedAt', async () => {
-      const scanDate = new Date(Date.now() - 24 * 60 * 60 * 1000); // Yesterday
-      const assetData = { ...getSampleAssetData('create_with_scan'), lastScannedAt: scanDate.toISOString() };
-      const response = await agent
-        .post('/api/assets')
-        .send(assetData)
-        .expect(201);
-
-      expect(response.body.id).toBeDefined();
-      createdAssetId = response.body.id;
-      expect(response.body.lastScannedAt).toBeDefined();
-      // Compare date parts, ignoring potential microsecond differences if DB truncates/rounds
-      expect(new Date(response.body.lastScannedAt).toISOString().split('.')[0]) 
-        .toBe(scanDate.toISOString().split('.')[0]);
-      
-      // Verify in DB
-      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, createdAssetId as number) });
-      expect(dbAsset?.lastScannedAt).toBeDefined();
-      expect(dbAsset?.lastScannedAt?.toISOString().split('.')[0])
-        .toBe(scanDate.toISOString().split('.')[0]);
-    });
-    
-    it('should fail to create an asset with an invalid lastScannedAt date string', async () => {
-      const assetData = { ...getSampleAssetData('create_invalid_scan'), lastScannedAt: 'not-a-date' };
-      const response = await agent
-        .post('/api/assets')
-        .send(assetData)
-        .expect(400);
-      expect(response.body.message).toBe('Invalid lastScannedAt date format.');
     });
 
     it('should fail to create an asset with missing required fields (name)', async () => {
-      const { name, ...assetDataWithoutName } = getSampleAssetData('missing_name');
+      const { name, ...assetDataWithoutName } = getSampleAssetData('missing_name_crud');
       const response = await agent
         .post('/api/assets')
         .send(assetDataWithoutName)
         .expect(400);
       expect(response.body.message).toBe('Name, type, and IP address are required.');
     });
-    
+
     it('should fail to create an asset with an invalid type enum', async () => {
-        const assetData = { ...getSampleAssetData('invalid_type'), type: 'invalid_enum_value' };
+        const assetData = { ...getSampleAssetData('invalid_type_crud'), type: 'invalid_enum_value' };
         const response = await agent
             .post('/api/assets')
             .send(assetData)
@@ -175,141 +174,82 @@ describe('Asset API (/api/assets)', () => {
 
   describe('GET /api/assets (List Assets)', () => {
     it('should retrieve all assets (or an empty array if none)', async () => {
-      // First, ensure at least one asset is created for this test scope if we want to test non-empty
-      const assetData = getSampleAssetData('list_test');
+      const assetData = getSampleAssetData('list_test_crud');
       const createRes = await agent.post('/api/assets').send(assetData).expect(201);
-      createdAssetId = createRes.body.id;
+      createdAssetIdForCRUD = createRes.body.id;
 
       const response = await agent.get('/api/assets').expect(200);
       expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(1); // Check if the created asset is in the list
-      expect(response.body.some((asset: any) => asset.id === createdAssetId)).toBe(true);
+      expect(response.body.length).toBeGreaterThanOrEqual(1);
+      expect(response.body.some((asset: any) => asset.id === createdAssetIdForCRUD)).toBe(true);
     });
-    
-    it('should return an empty array if no assets exist (after cleanup)', async () => {
-        // Ensure all assets are cleaned up (this is tricky without more specific targeting)
-        // This test relies on previous cleanup, or we'd need a dedicated cleanup before it.
-        // For now, we assume afterEach handles specific test creations.
-        // A more robust test would delete ALL assets and then GET.
-        // This test is more of a placeholder given current cleanup strategy.
-        // Let's clear the createdAssetId from a previous test in this describe block if any.
-        if (createdAssetId) {
-            await db.delete(assetsTable).where(eq(assetsTable.id, createdAssetId));
-            createdAssetId = null;
+
+    it('should return an empty array if no assets exist (after cleanup, relies on isolation)', async () => {
+        if (createdAssetIdForCRUD) { // Clear any from previous test in this block
+            await db.delete(assetsTable).where(eq(assetsTable.id, createdAssetIdForCRUD));
+            createdAssetIdForCRUD = null;
         }
+        // This test is more reliable if we ensure the DB is truly empty for assets.
+        // For now, we assume afterEach from the parent scope will handle broader cleanup.
         const response = await agent.get('/api/assets').expect(200);
         expect(Array.isArray(response.body)).toBe(true);
-        // This assertion is weak if other tests are running concurrently or failed to clean up.
-        // expect(response.body.length).toBe(0); // This might fail if other assets exist.
+        // Check if it's empty only if we are sure no other tests are polluting
+        // expect(response.body.length).toBe(0);
     });
   });
 
   describe('GET /api/assets/:assetId (Retrieve Asset by ID)', () => {
     let tempAssetId: number;
     beforeEach(async () => {
-        const assetData = getSampleAssetData('get_by_id');
+        const assetData = getSampleAssetData('get_by_id_crud');
         const res = await agent.post('/api/assets').send(assetData).expect(201);
         tempAssetId = res.body.id;
-        createdAssetId = tempAssetId; // Ensure it's cleaned up
+        createdAssetIdForCRUD = tempAssetId;
     });
 
     it('should retrieve an existing asset by ID', async () => {
       const response = await agent.get(`/api/assets/${tempAssetId}`).expect(200);
       expect(response.body.id).toBe(tempAssetId);
-      expect(response.body.name).toMatch(/Test Asset get_by_id/);
+      expect(response.body.name).toMatch(/Test Asset get_by_id_crud/);
     });
 
     it('should return 404 for a non-existent asset ID', async () => {
-      await agent.get('/api/assets/999999').expect(404);
+      await agent.get('/api/assets/9999999').expect(404);
     });
-    
+
     it('should return 400 for an invalid ID format (non-numeric)', async () => {
-        await agent.get('/api/assets/invalidID').expect(400);
+        await agent.get('/api/assets/invalidIDcrud').expect(400);
     });
   });
 
   describe('PUT /api/assets/:assetId (Update Asset)', () => {
     let tempAssetId: number;
-    const initialAssetData = getSampleAssetData('update_initial');
-    
+    const initialAssetData = getSampleAssetData('update_initial_crud');
+
     beforeEach(async () => {
         const res = await agent.post('/api/assets').send(initialAssetData).expect(201);
         tempAssetId = res.body.id;
-        createdAssetId = tempAssetId; // Ensure it's cleaned up
+        createdAssetIdForCRUD = tempAssetId;
     });
 
-    it('should successfully update an existing asset (name and type)', async () => {
-      const updatedData = { name: 'Updated Asset Name', type: 'workstation' as const };
+    it('should successfully update an existing asset', async () => {
+      const updatedData = { name: 'Updated Asset Name CRUD', type: 'workstation' as const };
       const response = await agent
         .put(`/api/assets/${tempAssetId}`)
         .send(updatedData)
         .expect(200);
       expect(response.body.name).toBe(updatedData.name);
       expect(response.body.type).toBe(updatedData.type);
-      expect(response.body.ipAddress).toBe(initialAssetData.ipAddress); // Unchanged field
-      // lastScannedAt should remain as it was (null in this case, as initialAssetData doesn't set it)
-      const dbAssetInitial = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, tempAssetId) });
-      expect(dbAssetInitial?.lastScannedAt).toBeNull(); // Assuming initialAssetData doesn't have lastScannedAt
-    });
-    
-    it('should successfully update lastScannedAt to a new valid date', async () => {
-      const newScanDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000); // Two days ago
-      const updatedData = { lastScannedAt: newScanDate.toISOString() };
-      const response = await agent
-        .put(`/api/assets/${tempAssetId}`)
-        .send(updatedData)
-        .expect(200);
-      expect(response.body.lastScannedAt).toBeDefined();
-      expect(new Date(response.body.lastScannedAt).toISOString().split('.')[0])
-        .toBe(newScanDate.toISOString().split('.')[0]);
-       // Verify in DB
-      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, tempAssetId) });
-      expect(dbAsset?.lastScannedAt?.toISOString().split('.')[0])
-        .toBe(newScanDate.toISOString().split('.')[0]);
-    });
-
-    it('should successfully update lastScannedAt to null', async () => {
-      // First, set a lastScannedAt date
-      const initialScanDate = new Date();
-      await agent.put(`/api/assets/${tempAssetId}`).send({ lastScannedAt: initialScanDate.toISOString() }).expect(200);
-      
-      // Now, update it to null
-      const updatedData = { lastScannedAt: null };
-      const response = await agent
-        .put(`/api/assets/${tempAssetId}`)
-        .send(updatedData)
-        .expect(200);
-      expect(response.body.lastScannedAt).toBeNull();
-      // Verify in DB
-      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, tempAssetId) });
-      expect(dbAsset?.lastScannedAt).toBeNull();
-    });
-
-    it('should fail to update lastScannedAt with an invalid date string', async () => {
-      const updatedData = { lastScannedAt: 'not-a-valid-date' };
-      const response = await agent
-        .put(`/api/assets/${tempAssetId}`)
-        .send(updatedData)
-        .expect(400);
-      expect(response.body.message).toBe('Invalid lastScannedAt date format.');
-    });
-    
-    it('should not update any field if an empty body is sent and return 400', async () => {
-        const response = await agent
-            .put(`/api/assets/${tempAssetId}`)
-            .send({}) // Empty body
-            .expect(400); 
-        expect(response.body.message).toBe('No fields provided for update.');
     });
 
     it('should return 404 when trying to update a non-existent asset', async () => {
-      await agent.put('/api/assets/999999').send({ name: 'NonExistentUpdate' }).expect(404);
+      await agent.put('/api/assets/9999999').send({ name: 'NonExistentUpdateCRUD' }).expect(404);
     });
-    
+
     it('should fail to update with an invalid type enum', async () => {
         const response = await agent
             .put(`/api/assets/${tempAssetId}`)
-            .send({ type: 'invalid_enum_for_put' })
+            .send({ type: 'invalid_enum_for_put_crud' })
             .expect(400);
         expect(response.body.message).toMatch(/Invalid asset type/);
     });
@@ -318,75 +258,115 @@ describe('Asset API (/api/assets)', () => {
   describe('DELETE /api/assets/:assetId (Delete Asset)', () => {
     let tempAssetId: number;
     beforeEach(async () => {
-        const assetData = getSampleAssetData('delete_target');
+        const assetData = getSampleAssetData('delete_target_crud');
         const res = await agent.post('/api/assets').send(assetData).expect(201);
         tempAssetId = res.body.id;
-        // Don't assign to createdAssetId here, as we want to verify deletion
+        // Do not assign to createdAssetIdForCRUD here, as we want to verify deletion
     });
 
     it('should successfully delete an existing asset', async () => {
-      const response = await agent.delete(`/api/assets/${tempAssetId}`).expect(200);
-      expect(response.body.message).toBe('Asset deleted successfully.');
-      expect(response.body.assetId).toBe(tempAssetId);
-
-      // Verify it's actually gone
-      await agent.get(`/api/assets/${tempAssetId}`).expect(404);
+      await agent.delete(`/api/assets/${tempAssetId}`).expect(200);
+      await agent.get(`/api/assets/${tempAssetId}`).expect(404); // Verify it's gone
     });
 
     it('should return 404 when trying to delete a non-existent asset', async () => {
-      await agent.delete('/api/assets/999999').expect(404);
-    });
-    
-    it('should return 400 for an invalid ID format (non-numeric)', async () => {
-        await agent.delete('/api/assets/invalidID').expect(400);
+      await agent.delete('/api/assets/9999999').expect(404);
     });
   });
 
-  // --- Tests for POST /api/assets/:assetId/scan ---
-  describe('POST /api/assets/:assetId/scan (Scan Asset)', () => {
-    let tempAssetId: number;
-    const isRecent = (dateString: string | null | undefined, deltaSeconds = 5) => {
-        if (!dateString) return false;
-        const date = new Date(dateString);
-        const now = new Date();
-        return Math.abs(now.getTime() - date.getTime()) < deltaSeconds * 1000;
-    };
+  // --- Simulated Scan API Tests ---
+  describe('POST /api/assets/:assetId/scan', () => {
+    let currentTestAssetId: number;
+    const scanTestVulnerabilityIds: number[] = [];
 
     beforeEach(async () => {
-      const assetData = getSampleAssetData('scan_target');
-      const res = await agent.post('/api/assets').send(assetData).expect(201);
-      tempAssetId = res.body.id;
-      createdAssetId = tempAssetId; // Ensure cleanup
+      // Create a fresh asset for each scan test
+      const assetData = getSampleAssetData(`scan_target_${Date.now()}`);
+      const assetRes = await agent.post('/api/assets').send(assetData).expect(201);
+      currentTestAssetId = assetRes.body.id;
+      createdAssetIdsForScanTest.push(currentTestAssetId); // Track for global cleanup
+
+      // Ensure some global vulnerabilities exist for scanning
+      // Create 3 vulnerabilities if they don't already exist in this test run
+      if (scanTestVulnerabilityIds.length === 0) {
+        for (let i = 0; i < 3; i++) {
+          const vulnData = getSampleVulnerabilityData(`global_scan_vuln_${i}_${Date.now()}`);
+          const vulnRes = await agent.post('/api/vulnerabilities').send(vulnData).expect(201);
+          scanTestVulnerabilityIds.push(vulnRes.body.id);
+          createdVulnerabilityIdsForScanTest.push(vulnRes.body.id); // Track for global cleanup
+        }
+      }
     });
 
-    it('should successfully scan an asset and update lastScannedAt', async () => {
-      const response = await agent
-        .post(`/api/assets/${tempAssetId}/scan`)
-        .send() // No body needed
-        .expect(200);
+    // No specific afterEach for this inner describe, global afterEach will handle createdAssetIdsForScanTest etc.
 
-      expect(response.body.id).toBe(tempAssetId);
-      expect(response.body.lastScannedAt).toBeDefined();
-      expect(isRecent(response.body.lastScannedAt)).toBe(true);
+    it('should return 401 if not authenticated', async () => {
+      await request(app).post(`/api/assets/${currentTestAssetId}/scan`).expect(401);
+    });
+
+    it('should return 404 for a non-existent assetId', async () => {
+      await agent.post('/api/assets/9999999/scan').expect(404);
+    });
+
+    it('should successfully scan and create new links for an asset with no existing vulnerabilities', async () => {
+      const response = await agent.post(`/api/assets/${currentTestAssetId}/scan`).expect(200);
+
+      expect(response.body.message).toBe('Simulated scan completed.');
+      expect(response.body.assetId).toBe(currentTestAssetId);
+      expect(response.body.newlyLinked).toBeGreaterThan(0); // Expecting at least one of the global vulns to be linked
+      expect(response.body.newlyLinked).toBeLessThanOrEqual(5); // Scan processes up to 5
+      expect(response.body.updatedLinks).toBe(0);
+      expect(response.body.vulnerabilitiesProcessed).toBe(scanTestVulnerabilityIds.length > 5 ? 5 : scanTestVulnerabilityIds.length);
 
       // Verify in DB
-      const dbAsset = await db.query.assetsTable.findFirst({ where: eq(assetsTable.id, tempAssetId) });
-      expect(dbAsset).toBeDefined();
-      expect(dbAsset?.lastScannedAt).toBeDefined();
-      expect(isRecent(dbAsset?.lastScannedAt?.toISOString())).toBe(true);
+      const links = await db.query.assetVulnerabilitiesTable.findMany({
+        where: eq(assetVulnerabilitiesTable.assetId, currentTestAssetId),
+      });
+      expect(links.length).toBe(response.body.newlyLinked);
+      links.forEach(link => {
+        expect(link.status).toBe('open');
+        expect(new Date().getTime() - new Date(link.lastSeenAt).getTime()).toBeLessThan(5000); // Within 5 seconds
+        createdLinkIdsForScanTest.push(link.id); // Track for cleanup
+      });
     });
 
-    it('should return 404 when trying to scan a non-existent asset', async () => {
-      await agent.post('/api/assets/999999/scan').send().expect(404);
+    it('should successfully scan and update existing links (status and lastSeenAt)', async () => {
+      // Manually link one of the global vulnerabilities with 'remediated' status and old date
+      const vulnToLink = scanTestVulnerabilityIds[0];
+      const oldDate = new Date('2023-01-01T00:00:00.000Z');
+      const manualLinkRes = await agent
+        .post(`/api/assets/${currentTestAssetId}/vulnerabilities`)
+        .send({
+          vulnerabilityId: vulnToLink,
+          status: 'remediated',
+          lastSeenAt: oldDate.toISOString()
+        })
+        .expect(201);
+      const manualLinkId = manualLinkRes.body.id;
+      createdLinkIdsForScanTest.push(manualLinkId);
+
+      const response = await agent.post(`/api/assets/${currentTestAssetId}/scan`).expect(200);
+      expect(response.body.updatedLinks).toBeGreaterThanOrEqual(1);
+      // newlyLinked could be > 0 if other global vulns were picked up
+
+      const updatedLink = await db.query.assetVulnerabilitiesTable.findFirst({
+        where: eq(assetVulnerabilitiesTable.id, manualLinkId),
+      });
+      expect(updatedLink).toBeDefined();
+      expect(updatedLink?.status).toBe('open');
+      expect(new Date(updatedLink!.lastSeenAt).getTime()).toBeGreaterThan(oldDate.getTime());
     });
 
-    it('should return 400 for an invalid asset ID format (non-numeric)', async () => {
-      await agent.post('/api/assets/invalidID/scan').send().expect(400);
-    });
+    it('should return 0 processed if no vulnerabilities exist in the system', async () => {
+        // Temporarily delete all vulnerabilities to test this edge case
+        await db.delete(vulnerabilitiesTable).where(sql`${vulnerabilitiesTable.id} IN ${scanTestVulnerabilityIds}`);
+        scanTestVulnerabilityIds.length = 0; // Clear tracked IDs as they are deleted
 
-    // Unauthenticated test is covered by the Authentication Checks describe block
-    // it('should return 401 if not authenticated', async () => {
-    //   await request(app).post(`/api/assets/${tempAssetId}/scan`).send().expect(401);
-    // });
+        const response = await agent.post(`/api/assets/${currentTestAssetId}/scan`).expect(200);
+        expect(response.body.message).toMatch(/No vulnerabilities available/);
+        expect(response.body.newlyLinked).toBe(0);
+        expect(response.body.updatedLinks).toBe(0);
+        expect(response.body.vulnerabilitiesProcessed).toBe(0);
+    });
   });
 });

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { 
-    assets as assetsTable, 
+import {
+    assets as assetsTable,
     vulnerabilities as vulnerabilitiesTable,
     assets_vulnerabilities as assetVulnerabilitiesTable,
     vulnerabilitySeverityEnum
@@ -47,7 +47,7 @@ router.get('/statistics', async (req: Request, res: Response) => {
         acc[severityValue] = 0;
         return acc;
     }, {} as Record<typeof vulnerabilitySeverityEnum.enumValues[number], number>);
-    
+
     // Populate counts from the query result
     openBySeverityResult.forEach(row => {
       if (row.severity) { // Check if severity is not null (it shouldn't be based on schema)
@@ -76,7 +76,6 @@ router.get('/recent-vulnerabilities', async (req: Request, res: Response) => {
         joinId: assetVulnerabilitiesTable.id,
         vulnerabilityName: vulnerabilitiesTable.name,
         vulnerabilitySeverity: vulnerabilitiesTable.severity,
-        vulnerabilitySource: vulnerabilitiesTable.source, // Added source field
         assetName: assetsTable.name,
         assetIpAddress: assetsTable.ipAddress,
         lastSeenOrUpdatedAt: assetVulnerabilitiesTable.updatedAt, // Using updatedAt from the join table
@@ -93,7 +92,7 @@ router.get('/recent-vulnerabilities', async (req: Request, res: Response) => {
     // The query selects direct fields, so if the join fails to find a match, those fields would be null.
     // Filter out results where essential joined data might be missing if necessary, although FK constraints should prevent this.
     const result = recentVulnerabilityInstances.filter(
-        item => item.vulnerabilityName && item.assetName 
+        item => item.vulnerabilityName && item.assetName
     );
 
 

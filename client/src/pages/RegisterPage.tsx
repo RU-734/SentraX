@@ -2,13 +2,13 @@ import React, { useState, FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card';
 import { Link } from 'wouter'; // For "Already have an account?" link
 
@@ -145,7 +145,7 @@ const RegisterPage: React.FC = () => {
             {successMessage && (
               <p className="text-sm text-green-600 text-center pt-1">{successMessage}</p>
             )}
-            
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Creating account...' : 'Create Account'}
             </Button>

@@ -43,7 +43,7 @@ router.post('/register', async (req: Request, res: Response) => {
       passwordHash,
       role: role || userRoleEnum.enumValues[1], // Default to 'user' if not provided or use schema default
     };
-    
+
     // The schema already defines role as notNull with a default of 'user'
     // So, if role is not in req.body, it will use the schema default.
     // If role is provided and valid, it will be used.
@@ -100,7 +100,7 @@ router.post('/logout', (req: Request, res: Response) => {
         return res.status(500).json({ message: 'Logout failed. Please try again.' });
       }
       // The default cookie name for express-session is 'connect.sid'
-      res.clearCookie('connect.sid'); 
+      res.clearCookie('connect.sid');
       return res.status(200).json({ message: 'Logout successful' });
     });
   } else {
@@ -143,7 +143,7 @@ router.post('/login', async (req: Request, res: Response) => {
     req.session.user = {
       id: user.id,
       username: user.username,
-      role: user.role, 
+      role: user.role,
     };
 
     const { passwordHash, ...userInfo } = user;

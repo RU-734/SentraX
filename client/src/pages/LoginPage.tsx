@@ -2,13 +2,13 @@ import React, { useState, FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle
 } from '@/components/ui/card';
 import { Link } from 'wouter'; // For "Don't have an account?" link
 
@@ -97,7 +97,7 @@ const LoginPage: React.FC = () => {
             {error && (
               <p className="text-sm text-red-600 text-center pt-2">{error}</p>
             )}
-            
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Logging in...' : 'Login'}
             </Button>

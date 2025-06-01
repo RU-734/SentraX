@@ -33,7 +33,7 @@ describe('Auth Routes (/api/auth)', () => {
       console.error('Failed to clean up test user:', error);
     }
   });
-  
+
   // After all tests, close any open handles if necessary (e.g. db connection if managed manually)
   // Jest's --detectOpenHandles and potentially forceExit should handle this for now.
   // afterAll(async () => {
@@ -97,7 +97,7 @@ describe('Auth Routes (/api/auth)', () => {
       await request(app).post('/api/auth/register').send(testUser).expect(201);
       agent = request.agent(app); // Create an agent to handle cookies for session
     });
-    
+
     afterEach(() => {
         agent = undefined as any; // Clear agent
     });
@@ -144,7 +144,7 @@ describe('Auth Routes (/api/auth)', () => {
     it('should grant access and return user data if authenticated', async () => {
       // Register user first
       await request(app).post('/api/auth/register').send(testUser).expect(201);
-      
+
       // Create an agent and login to establish a session
       agent = request.agent(app);
       const loginResponse = await agent
@@ -159,7 +159,7 @@ describe('Auth Routes (/api/auth)', () => {
       expect(meResponse.body.user.username).toBe(testUser.username);
       expect(meResponse.body.user.email).toBe(testUser.email);
       expect(meResponse.body.user.id).toBeDefined();
-      
+
       agent = undefined as any; // Clear agent
     });
   });
@@ -177,7 +177,7 @@ describe('Auth Routes (/api/auth)', () => {
         .send({ username: testUser.username, password: testUser.password })
         .expect(200);
     });
-    
+
     afterEach(() => {
         agent = undefined as any; // Clear agent
     });
@@ -195,12 +195,12 @@ describe('Auth Routes (/api/auth)', () => {
     it('should return success even if no active session (e.g., already logged out)', async () => {
       // First, logout to invalidate the session
       await agent.post('/api/auth/logout').expect(200);
-      
+
       // Attempt to logout again using the same agent (whose session should be invalid)
       // Or use a fresh request(app) if agent behavior is complex after invalidation
       const response = await agent.post('/api/auth/logout').expect(200);
       // The message might differ based on server impl: "no active session" vs "Logout successful"
-      expect(response.body.message).toMatch(/Logout successful/); 
+      expect(response.body.message).toMatch(/Logout successful/);
     });
   });
 });

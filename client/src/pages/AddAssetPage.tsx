@@ -43,7 +43,7 @@ const AddAssetPage: React.FC = () => {
           <a className="text-indigo-600 hover:text-indigo-800 transition duration-150 ease-in-out">&larr; Back to Assets</a>
         </Link>
       </div>
-      
+
       <AssetForm
         onSubmit={handleSubmit}
         isEditing={false}

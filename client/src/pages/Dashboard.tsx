@@ -32,7 +32,6 @@ interface RecentVulnerabilityInstance {
   vulnerabilitySeverity: string;
   assetName: string;
   assetIpAddress: string;
-  vulnerabilitySource?: string | null; // Added field for the source
   lastSeenOrUpdatedAt: string;
 }
 
@@ -65,9 +64,9 @@ const DashboardPage: React.FC = () => {
     }
 
     const fetchData = async (
-      url: string, 
-      setData: React.Dispatch<React.SetStateAction<any>>, 
-      setLoading: React.Dispatch<React.SetStateAction<boolean>>, 
+      url: string,
+      setData: React.Dispatch<React.SetStateAction<any>>,
+      setLoading: React.Dispatch<React.SetStateAction<boolean>>,
       setError: React.Dispatch<React.SetStateAction<string | null>>
     ) => {
       setLoading(true);
@@ -125,7 +124,7 @@ const DashboardPage: React.FC = () => {
           <p>No statistics data available.</p>
         )}
       </section>
-      
+
       {/* Open Vulnerabilities by Severity Section */}
       {!isStatsLoading && !statsError && statsData && (
         <section>
@@ -141,7 +140,7 @@ const DashboardPage: React.FC = () => {
                   severity === 'critical' ? 'text-red-600' :
                   severity === 'high' ? 'text-orange-500' :
                   severity === 'medium' ? 'text-yellow-500' :
-                  severity === 'low' ? 'text-blue-500' : 
+                  severity === 'low' ? 'text-blue-500' :
                   'text-gray-700' // informational
                 }`}
                 titleClassName="text-sm font-medium text-gray-600"
@@ -155,7 +154,7 @@ const DashboardPage: React.FC = () => {
       {/* Container for Recent Assets and Recent Vulnerabilities Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <section> {/* Recent Assets Section */}
-          <RecentAssetsWidget 
+          <RecentAssetsWidget
             assets={recentAssets}
             isLoading={isRecentAssetsLoading}
             error={recentAssetsError}
