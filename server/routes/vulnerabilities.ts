@@ -14,7 +14,7 @@ router.use(isAuthenticated);
 
 // POST /api/vulnerabilities - Create a new vulnerability
 router.post('/', async (req: Request, res: Response) => {
-  const { name, description, severity, cvssScore, references } = req.body;
+  const { name, description, severity, cvssScore, references, source } = req.body;
 
   // Basic validation
   if (!name || !description || !severity) {
@@ -46,6 +46,7 @@ router.post('/', async (req: Request, res: Response) => {
         severity,
         cvssScore: cvssScore ? String(cvssScore) : null, // Ensure it's a string or null
         references, // Array of strings
+        source: source || null, // Add source, default to null if not provided
       })
       .returning();
 
@@ -107,7 +108,7 @@ router.put('/:vulnerabilityId', async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Invalid vulnerability ID format.' });
   }
 
-  const { name, description, severity, cvssScore, references } = req.body;
+  const { name, description, severity, cvssScore, references, source } = req.body;
 
   // Validate severity if provided
   if (severity && !Object.values(vulnerabilitySeverityEnum.enumValues).includes(severity)) {
@@ -127,6 +128,7 @@ router.put('/:vulnerabilityId', async (req: Request, res: Response) => {
   if (severity !== undefined) updateData.severity = severity;
   if (cvssScore !== undefined) updateData.cvssScore = cvssScore ? String(cvssScore) : null;
   if (references !== undefined) updateData.references = references;
+  if (source !== undefined) updateData.source = source; // Add source to updateData
   // updatedAt is handled by $onUpdate in schema
 
   if (Object.keys(updateData).length === 0) {

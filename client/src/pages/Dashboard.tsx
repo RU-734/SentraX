@@ -32,6 +32,7 @@ interface RecentVulnerabilityInstance {
   vulnerabilitySeverity: string;
   assetName: string;
   assetIpAddress: string;
+  vulnerabilitySource?: string | null; // Added field for the source
   lastSeenOrUpdatedAt: string;
 }
 
