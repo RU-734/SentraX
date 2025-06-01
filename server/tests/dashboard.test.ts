@@ -1,9 +1,9 @@
 import request from 'supertest';
 import app from '../index'; // The Express app instance
 import { db } from '../db';   // Drizzle ORM instance
-import { 
-    users, 
-    assets as assetsTable, 
+import {
+    users,
+    assets as assetsTable,
     vulnerabilities as vulnerabilitiesTable,
     assets_vulnerabilities as assetVulnerabilitiesTable,
     assetTypeEnum,
@@ -105,21 +105,21 @@ describe('Dashboard API (/api/dashboard)', () => {
       createdLinkIds.push(link2.id);
       const link3 = (await linkAssetVulnerability({ assetId: asset1.id, vulnerabilityId: vuln3.id, status: 'remediated' }))[0];
       createdLinkIds.push(link3.id);
-      
+
       const response = await agent.get('/api/dashboard/statistics').expect(200);
-      
+
       expect(response.body).toHaveProperty('totalAssets');
       expect(response.body).toHaveProperty('totalVulnerabilities');
       expect(response.body).toHaveProperty('totalOpenVulnerabilityInstances');
       expect(response.body).toHaveProperty('openVulnerabilitiesBySeverity');
-      
+
       // Basic count verification - these will be affected by other tests if not perfectly isolated.
       // For more precise count checks in a shared DB env, query counts before and after test-specific setup.
       // This test assumes a relatively clean state for these specific items or that global count doesn't matter as much as structure.
       // For this example, we'll check against the items created *within this test*.
       // This requires re-querying the DB for totals if we want to be exact, or ensuring the test DB is truly empty.
       // The current implementation in dashboard.ts queries ALL assets/vulns. So we can only check if our additions impacted it.
-      
+
       expect(response.body.totalOpenVulnerabilityInstances).toBeGreaterThanOrEqual(2);
       expect(response.body.openVulnerabilitiesBySeverity.critical).toBeGreaterThanOrEqual(1);
       expect(response.body.openVulnerabilitiesBySeverity.high).toBeGreaterThanOrEqual(1);
@@ -136,9 +136,9 @@ describe('Dashboard API (/api/dashboard)', () => {
 
     it('should return up to 5 most recent assets, ordered by createdAt descending', async () => {
       for (let i = 0; i < 7; i++) {
-        const asset = (await createAsset({ 
-            name: `RecentAsset${i}`, 
-            type: 'server', 
+        const asset = (await createAsset({
+            name: `RecentAsset${i}`,
+            type: 'server',
             ipAddress: `1.2.3.${i}`,
             createdAt: new Date() // Drizzle defaultNow() will handle this, but explicit for test control
         }))[0];
@@ -196,11 +196,11 @@ describe('Dashboard API (/api/dashboard)', () => {
         createdLinkIds.push(link.id);
         if (i < 6) await sleep(10); // Ensure slight time difference for ordering
       }
-      
+
       const response = await agent.get('/api/dashboard/recent-vulnerabilities').expect(200);
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeLessThanOrEqual(5);
-      
+
       let lastUpdatedAt = Infinity;
       response.body.forEach((item: any) => {
         expect(item).toHaveProperty('joinId');

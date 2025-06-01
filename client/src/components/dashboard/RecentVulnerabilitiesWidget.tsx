@@ -22,7 +22,6 @@ interface RecentVulnerabilityInstance {
   vulnerabilitySeverity: string;
   assetName: string;
   assetIpAddress: string; // Available if needed, not explicitly requested for display here
-  vulnerabilitySource?: string | null; // Added source field
   lastSeenOrUpdatedAt: string;
   // assetId is not directly in this flat structure from backend,
   // but assetName implies an asset. Link will go to general /assets for now.
@@ -65,7 +64,6 @@ const RecentVulnerabilitiesWidget: React.FC<RecentVulnerabilitiesWidgetProps> = 
                 <TableRow>
                   <TableHead>Vulnerability</TableHead>
                   <TableHead>Severity</TableHead>
-                  <TableHead>Source</TableHead>
                   <TableHead>Asset</TableHead>
                   <TableHead className="text-right">Last Active</TableHead>
                 </TableRow>
@@ -77,7 +75,6 @@ const RecentVulnerabilitiesWidget: React.FC<RecentVulnerabilitiesWidgetProps> = 
                     <TableCell className={severityColorMap[vuln.vulnerabilitySeverity?.toLowerCase()] || 'text-gray-600'}>
                       {vuln.vulnerabilitySeverity || 'N/A'}
                     </TableCell>
-                    <TableCell className="text-sm text-gray-500">{vuln.vulnerabilitySource || 'N/A'}</TableCell>
                     <TableCell>
                       <Link href={`/assets`} className="hover:underline text-primary">
                         {vuln.assetName}

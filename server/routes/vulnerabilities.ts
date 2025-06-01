@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
-import { 
-    vulnerabilities as vulnerabilitiesTable, 
-    vulnerabilitySeverityEnum 
+import {
+    vulnerabilities as vulnerabilitiesTable,
+    vulnerabilitySeverityEnum
 } from '@shared/schema';
 import { eq, desc } from 'drizzle-orm';
 import { isAuthenticated } from '../middleware/authMiddleware';
@@ -14,7 +14,7 @@ router.use(isAuthenticated);
 
 // POST /api/vulnerabilities - Create a new vulnerability
 router.post('/', async (req: Request, res: Response) => {
-  const { name, description, severity, cvssScore, references, source } = req.body;
+  const { name, description, severity, cvssScore, references } = req.body;
 
   // Basic validation
   if (!name || !description || !severity) {
@@ -25,7 +25,7 @@ router.post('/', async (req: Request, res: Response) => {
   if (!Object.values(vulnerabilitySeverityEnum.enumValues).includes(severity)) {
     return res.status(400).json({ message: `Invalid severity. Must be one of: ${vulnerabilitySeverityEnum.enumValues.join(', ')}` });
   }
-  
+
   // Validate CVSS score format if provided (e.g., must be a number between 0.0 and 10.0)
   // For simplicity, we're using text in schema, but in a real app, more parsing/validation needed.
   // If cvssScore is provided, it should be a string representing a number for the decimal(3,1) type.
@@ -46,7 +46,6 @@ router.post('/', async (req: Request, res: Response) => {
         severity,
         cvssScore: cvssScore ? String(cvssScore) : null, // Ensure it's a string or null
         references, // Array of strings
-        source: source || null, // Add source, default to null if not provided
       })
       .returning();
 
@@ -108,13 +107,13 @@ router.put('/:vulnerabilityId', async (req: Request, res: Response) => {
     return res.status(400).json({ message: 'Invalid vulnerability ID format.' });
   }
 
-  const { name, description, severity, cvssScore, references, source } = req.body;
+  const { name, description, severity, cvssScore, references } = req.body;
 
   // Validate severity if provided
   if (severity && !Object.values(vulnerabilitySeverityEnum.enumValues).includes(severity)) {
     return res.status(400).json({ message: `Invalid severity. Must be one of: ${vulnerabilitySeverityEnum.enumValues.join(', ')}` });
   }
-  
+
   if (cvssScore !== undefined && cvssScore !== null) {
     const score = parseFloat(cvssScore);
     if (isNaN(score) || score < 0.0 || score > 10.0) {
@@ -128,7 +127,6 @@ router.put('/:vulnerabilityId', async (req: Request, res: Response) => {
   if (severity !== undefined) updateData.severity = severity;
   if (cvssScore !== undefined) updateData.cvssScore = cvssScore ? String(cvssScore) : null;
   if (references !== undefined) updateData.references = references;
-  if (source !== undefined) updateData.source = source; // Add source to updateData
   // updatedAt is handled by $onUpdate in schema
 
   if (Object.keys(updateData).length === 0) {

@@ -103,7 +103,7 @@ const EditAssetPage: React.FC = () => {
       </div>
     );
   }
-  
+
   if (!initialData) {
       // This case might be redundant if error above catches it, but good for robustness
       return (
@@ -127,7 +127,7 @@ const EditAssetPage: React.FC = () => {
           <a className="text-indigo-600 hover:text-indigo-800 transition duration-150 ease-in-out">&larr; Back to Assets</a>
         </Link>
       </div>
-      
+
       <AssetForm
         initialData={initialData}
         onSubmit={handleSubmit}

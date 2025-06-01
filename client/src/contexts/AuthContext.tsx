@@ -125,7 +125,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
       } else {
         // Even if logout API fails, clear user state on client for better UX
-        setUser(null); 
+        setUser(null);
         console.error('Logout API call failed, but user cleared on client.');
         // Optionally throw an error here if strict API success is required
       }

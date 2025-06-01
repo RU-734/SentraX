@@ -1,9 +1,9 @@
 import request from 'supertest';
 import app from '../index'; // The Express app instance
 import { db } from '../db';   // Drizzle ORM instance
-import { 
-    users, 
-    assets as assetsTable, 
+import {
+    users,
+    assets as assetsTable,
     vulnerabilities as vulnerabilitiesTable,
     assets_vulnerabilities as assetVulnerabilitiesTable,
     vulnerabilitySeverityEnum,
@@ -39,12 +39,12 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
     const registerResponse = await request(app)
       .post('/api/auth/register')
       .send(baseTestUser);
-    
+
     if (registerResponse.status !== 201 && registerResponse.status !== 409) { // Allow 409 if user exists
         console.error('Test user registration failed with status:', registerResponse.status, registerResponse.body);
         throw new Error('Failed to register test user for vulnerability tests.');
     }
-    
+
     // If user already exists (409), we can still try to login
     // If new user (201), use its ID. Otherwise, try to fetch existing.
     if (registerResponse.status === 201) {
@@ -60,7 +60,7 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
     const loginResponse = await agent
       .post('/api/auth/login')
       .send({ username: baseTestUser.username, password: baseTestUser.password });
-      
+
     if (loginResponse.status !== 200) {
         console.error("Login response body:", loginResponse.body);
         throw new Error('Login failed for test user in beforeAll for vulnerability tests.');
@@ -85,10 +85,6 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
 
   // Part 1: Vulnerability CRUD Tests
   describe('/api/vulnerabilities', () => {
-    // Define sample source values
-    const sampleSourceValue = "NVD";
-    const anotherSourceValue = "Internal Scan";
-
     afterEach(async () => {
       if (createdVulnerabilityId) {
         try {
@@ -115,53 +111,20 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
     });
 
     describe('POST / (Create Vulnerability)', () => {
-      it('should create a new vulnerability successfully without source (should be null)', async () => {
-        const vulnData = getSampleVulnerabilityData('create_no_source');
+      it('should create a new vulnerability successfully', async () => {
+        const vulnData = getSampleVulnerabilityData('create_success');
         const response = await agent.post('/api/vulnerabilities').send(vulnData).expect(201);
-        
         expect(response.body.id).toBeDefined();
         createdVulnerabilityId = response.body.id;
         expect(response.body.name).toBe(vulnData.name);
         expect(response.body.severity).toBe(vulnData.severity);
-        expect(response.body.source).toBeNull();
-
-        // Verify in DB
-        const dbVuln = await db.query.vulnerabilitiesTable.findFirst({ where: eq(vulnerabilitiesTable.id, createdVulnerabilityId as number) });
-        expect(dbVuln?.source).toBeNull();
-      });
-
-      it('should create a new vulnerability successfully with a source string', async () => {
-        const vulnData = { ...getSampleVulnerabilityData('create_with_source'), source: sampleSourceValue };
-        const response = await agent.post('/api/vulnerabilities').send(vulnData).expect(201);
-        
-        expect(response.body.id).toBeDefined();
-        createdVulnerabilityId = response.body.id;
-        expect(response.body.name).toBe(vulnData.name);
-        expect(response.body.source).toBe(sampleSourceValue);
-
-        // Verify in DB
-        const dbVuln = await db.query.vulnerabilitiesTable.findFirst({ where: eq(vulnerabilitiesTable.id, createdVulnerabilityId as number) });
-        expect(dbVuln?.source).toBe(sampleSourceValue);
-      });
-      
-      it('should create a new vulnerability successfully with source explicitly as null', async () => {
-        const vulnData = { ...getSampleVulnerabilityData('create_source_null'), source: null };
-        const response = await agent.post('/api/vulnerabilities').send(vulnData).expect(201);
-        
-        expect(response.body.id).toBeDefined();
-        createdVulnerabilityId = response.body.id;
-        expect(response.body.source).toBeNull();
-
-        // Verify in DB
-        const dbVuln = await db.query.vulnerabilitiesTable.findFirst({ where: eq(vulnerabilitiesTable.id, createdVulnerabilityId as number) });
-        expect(dbVuln?.source).toBeNull();
       });
 
       it('should fail with missing required fields (name)', async () => {
         const { name, ...data } = getSampleVulnerabilityData('missing_name');
         await agent.post('/api/vulnerabilities').send(data).expect(400, /Name, description, and severity are required/);
       });
-      
+
       it('should fail with invalid severity enum', async () => {
         const data = { ...getSampleVulnerabilityData('invalid_sev'), severity: 'super_critical' };
         await agent.post('/api/vulnerabilities').send(data).expect(400, /Invalid severity/);
@@ -187,7 +150,7 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
         expect(response.body.some(v => v.id === createdVulnerabilityId)).toBe(true);
       });
     });
-    
+
     describe('GET /:vulnerabilityId (Retrieve Vulnerability)', () => {
         it('should retrieve an existing vulnerability', async () => {
             const vulnData = getSampleVulnerabilityData('get_one');
@@ -205,71 +168,17 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
 
     describe('PUT /:vulnerabilityId (Update Vulnerability)', () => {
         beforeEach(async () => { // Create a vuln before each PUT test
-            const vulnData = getSampleVulnerabilityData('update_target_initial'); // No source initially
+            const vulnData = getSampleVulnerabilityData('update_target');
             const res = await agent.post('/api/vulnerabilities').send(vulnData).expect(201);
             createdVulnerabilityId = res.body.id;
         });
 
-        it('should successfully update name and severity, leaving source as null', async () => {
-            const updatePayload = { name: 'Updated Vuln Name For Source Test', severity: vulnerabilitySeverityEnum.enumValues[0] }; // critical
+        it('should successfully update an existing vulnerability', async () => {
+            const updatePayload = { name: 'Updated Vuln Name', severity: vulnerabilitySeverityEnum.enumValues[0] }; // critical
             const response = await agent.put(`/api/vulnerabilities/${createdVulnerabilityId}`).send(updatePayload).expect(200);
             expect(response.body.name).toBe(updatePayload.name);
             expect(response.body.severity).toBe(updatePayload.severity);
-            expect(response.body.source).toBeNull(); // Source was not provided, should remain null
-
-            const dbVuln = await db.query.vulnerabilitiesTable.findFirst({ where: eq(vulnerabilitiesTable.id, createdVulnerabilityId as number) });
-            expect(dbVuln?.source).toBeNull();
         });
-
-        it('should successfully update source to a new string value', async () => {
-            const updatePayload = { source: sampleSourceValue };
-            const response = await agent.put(`/api/vulnerabilities/${createdVulnerabilityId}`).send(updatePayload).expect(200);
-            expect(response.body.source).toBe(sampleSourceValue);
-
-            const dbVuln = await db.query.vulnerabilitiesTable.findFirst({ where: eq(vulnerabilitiesTable.id, createdVulnerabilityId as number) });
-            expect(dbVuln?.source).toBe(sampleSourceValue);
-        });
-        
-        it('should successfully update source from one string to another', async () => {
-            // First set an initial source
-            await agent.put(`/api/vulnerabilities/${createdVulnerabilityId}`).send({ source: sampleSourceValue }).expect(200);
-            
-            // Then update to another source
-            const updatePayload = { source: anotherSourceValue };
-            const response = await agent.put(`/api/vulnerabilities/${createdVulnerabilityId}`).send(updatePayload).expect(200);
-            expect(response.body.source).toBe(anotherSourceValue);
-
-            const dbVuln = await db.query.vulnerabilitiesTable.findFirst({ where: eq(vulnerabilitiesTable.id, createdVulnerabilityId as number) });
-            expect(dbVuln?.source).toBe(anotherSourceValue);
-        });
-
-        it('should successfully update source to null (clearing it)', async () => {
-            // First set an initial source
-            await agent.put(`/api/vulnerabilities/${createdVulnerabilityId}`).send({ source: sampleSourceValue }).expect(200);
-
-            // Then update source to null
-            const updatePayload = { source: null };
-            const response = await agent.put(`/api/vulnerabilities/${createdVulnerabilityId}`).send(updatePayload).expect(200);
-            expect(response.body.source).toBeNull();
-            
-            const dbVuln = await db.query.vulnerabilitiesTable.findFirst({ where: eq(vulnerabilitiesTable.id, createdVulnerabilityId as number) });
-            expect(dbVuln?.source).toBeNull();
-        });
-
-        it('should leave source unchanged if not provided in update payload', async () => {
-            // First set an initial source
-            await agent.put(`/api/vulnerabilities/${createdVulnerabilityId}`).send({ source: sampleSourceValue }).expect(200);
-            
-            // Update other fields
-            const updatePayload = { description: "A new description, source not mentioned" };
-            const response = await agent.put(`/api/vulnerabilities/${createdVulnerabilityId}`).send(updatePayload).expect(200);
-            expect(response.body.description).toBe(updatePayload.description);
-            expect(response.body.source).toBe(sampleSourceValue); // Source should remain unchanged
-
-            const dbVuln = await db.query.vulnerabilitiesTable.findFirst({ where: eq(vulnerabilitiesTable.id, createdVulnerabilityId as number) });
-            expect(dbVuln?.source).toBe(sampleSourceValue);
-        });
-
         it('should return 404 for updating non-existent vulnerability', async () => {
             await agent.put('/api/vulnerabilities/999999').send({ name: 'No Such Vuln' }).expect(404);
         });
@@ -282,7 +191,7 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
             // res1.body.id will be cleaned by afterEach if createdVulnerabilityId is overwritten,
             // so we need another way or ensure afterAll cleans it.
             // For simplicity, let's make its name part of the afterAll cleanup pattern.
-            
+
             const vulnData2 = getSampleVulnerabilityData('unique_name2_put');
             const res2 = await agent.post('/api/vulnerabilities').send(vulnData2).expect(201);
             // createdVulnerabilityId is now res2.body.id
@@ -293,7 +202,7 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
             await db.delete(vulnerabilitiesTable).where(eq(vulnerabilitiesTable.id, res1.body.id));
         });
     });
-    
+
     describe('DELETE /:vulnerabilityId (Delete Vulnerability)', () => {
         beforeEach(async () => {
             const vulnData = getSampleVulnerabilityData('delete_target');
@@ -345,7 +254,7 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
       if (testVulnerabilityId) await db.delete(vulnerabilitiesTable).where(eq(vulnerabilitiesTable.id, testVulnerabilityId));
       createdAssetIdForLinkTest = null;
     });
-    
+
     // Note: Auth checks for these nested routes are implicitly covered by the main asset router's auth middleware.
     // Explicitly testing them again here for each sub-route is redundant if the router-level middleware is trusted.
 
@@ -368,7 +277,7 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
           .send({ vulnerabilityId: 999999 })
           .expect(404, /Vulnerability not found/);
       });
-      
+
       it('should fail to link to a non-existent asset', async () => {
         await agent
           .post(`/api/assets/999999/vulnerabilities`)
@@ -380,10 +289,10 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
         await agent.post(`/api/assets/${testAssetId}/vulnerabilities`).send({ vulnerabilityId: testVulnerabilityId }).expect(201);
         await agent.post(`/api/assets/${testAssetId}/vulnerabilities`).send({ vulnerabilityId: testVulnerabilityId }).expect(409, /already linked/);
       });
-      
+
       it('should successfully link with optional fields (details, lastSeenAt)', async () => {
-          const linkDetails = { 
-              vulnerabilityId: testVulnerabilityId, 
+          const linkDetails = {
+              vulnerabilityId: testVulnerabilityId,
               status: 'remediated' as const,
               details: 'Specific details for this link.',
               remediationNotes: 'Patched on server X.',
@@ -398,7 +307,7 @@ describe('Vulnerability and Asset-Vulnerability Link APIs', () => {
           expect(response.body.status).toBe(linkDetails.status);
       });
     });
-    
+
     describe('GET / (List Vulnerabilities for an Asset)', () => {
         it('should retrieve linked vulnerabilities for an asset', async () => {
             await agent.post(`/api/assets/${testAssetId}/vulnerabilities`).send({ vulnerabilityId: testVulnerabilityId }).expect(201);

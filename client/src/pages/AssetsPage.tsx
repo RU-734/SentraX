@@ -2,7 +2,6 @@ import React, { useState, useEffect, Fragment } from 'react'; // Added Fragment
 import { useAuth } from '../../contexts/AuthContext';
 import { Link } from 'wouter';
 import Button from '../components/ui/Button';
-import { format } from 'date-fns';
 
 // Asset interface
 interface Asset {
@@ -15,7 +14,6 @@ interface Asset {
   description?: string | null;
   createdAt: string;
   updatedAt: string;
-  lastScannedAt?: string | null;
 }
 
 // Interface for vulnerabilities linked to an asset (from backend response)
@@ -36,7 +34,6 @@ interface LinkedVulnerability {
     references?: string[] | null;
     createdAt: string; // from the vulnerabilities table
     updatedAt: string; // from the vulnerabilities table
-    source?: string | null; // Added source field
   } | null;
 }
 
@@ -75,16 +72,16 @@ const AssetsPage: React.FC = () => {
   const [updateStatusLoading, setUpdateStatusLoading] = useState<{ [key: number]: boolean }>({});
   const [updateStatusError, setUpdateStatusError] = useState<{ [key: number]: string | null }>({});
 
-  // State for scanning an asset
+  // State for simulated scan action
   const [scanLoading, setScanLoading] = useState<{ [key: number]: boolean }>({});
   const [scanError, setScanError] = useState<{ [key: number]: string | null }>({});
+  const [scanSuccessMessage, setScanSuccessMessage] = useState<{ [key: number]: string | null }>({});
 
 const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
   'open',
   'remediated',
   'ignored',
   'pending_verification',
-  'archived',
 ];
 
 
@@ -109,7 +106,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
       setVulnerabilityLoading(prev => ({ ...prev, [assetId]: false }));
     }
   };
-  
+
   const handleToggleVulnerabilities = (assetId: number) => {
     const isCurrentlyExpanded = expandedAssetId === assetId;
     setExpandedAssetId(isCurrentlyExpanded ? null : assetId);
@@ -125,7 +122,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
       }
     }
   };
-  
+
   const fetchAllVulnerabilities = async () => {
     setAllVulnerabilitiesLoading(true);
     setAllVulnerabilitiesError(null);
@@ -145,7 +142,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
       setAllVulnerabilitiesLoading(false);
     }
   };
-  
+
   const handleLinkVulnerability = async (assetId: number) => {
     const vulnIdToLink = selectedVulnerabilityId[assetId];
     if (!vulnIdToLink) {
@@ -177,7 +174,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
       setLinkVulnerabilityLoading(prev => ({ ...prev, [assetId]: false }));
     }
   };
-  
+
   const handleUpdateStatus = async (assetId: number, joinId: number, newStatus: string) => {
     setUpdateStatusLoading(prev => ({ ...prev, [joinId]: true }));
     setUpdateStatusError(prev => ({ ...prev, [joinId]: null }));
@@ -192,7 +189,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
       const data = await response.json();
       if (response.ok) {
         // Refresh vulnerabilities for the parent asset to show updated status
-        fetchVulnerabilitiesForAsset(assetId); 
+        fetchVulnerabilitiesForAsset(assetId);
       } else {
         setUpdateStatusError(prev => ({ ...prev, [joinId]: data.message || 'Failed to update status.' }));
       }
@@ -204,37 +201,34 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
     }
   };
 
-  const handleScanAsset = async (assetId: number) => {
+  const handleSimulateScan = async (assetId: number) => {
     setScanLoading(prev => ({ ...prev, [assetId]: true }));
     setScanError(prev => ({ ...prev, [assetId]: null }));
+    setScanSuccessMessage(prev => ({ ...prev, [assetId]: null }));
 
     try {
       const response = await fetch(`/api/assets/${assetId}/scan`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // Auth is typically handled by session cookie, no explicit Authorization header needed here
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
-
+      const data = await response.json();
       if (response.ok) {
-        const updatedAsset: Asset = await response.json();
-        setAssets(currentAssets =>
-          currentAssets.map(a => (a.id === assetId ? updatedAsset : a))
-        );
-        // Optionally, display a success message or clear error for this specific asset
-        setScanError(prev => ({ ...prev, [assetId]: null })); 
+        setScanSuccessMessage(prev => ({
+          ...prev,
+          [assetId]: `${data.message} Processed: ${data.vulnerabilitiesProcessed}, New: ${data.newlyLinked}, Updated: ${data.updatedLinks}`
+        }));
+        fetchVulnerabilitiesForAsset(assetId); // Refresh the list
       } else {
-        const errorData = await response.json();
-        setScanError(prev => ({ ...prev, [assetId]: errorData.message || 'Failed to scan asset.' }));
+        setScanError(prev => ({ ...prev, [assetId]: data.message || 'Failed to simulate scan.' }));
       }
     } catch (err) {
-      console.error(`Error scanning asset ${assetId}:`, err);
-      setScanError(prev => ({ ...prev, [assetId]: 'An unexpected client-side error occurred.' }));
+      console.error(`Error simulating scan for asset ${assetId}:`, err);
+      setScanError(prev => ({ ...prev, [assetId]: 'An unexpected error occurred during scan.' }));
     } finally {
       setScanLoading(prev => ({ ...prev, [assetId]: false }));
     }
   };
+
 
   useEffect(() => {
     const fetchAssets = async () => {
@@ -264,7 +258,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
         } else if (response.status === 401 || response.status === 403) {
           setError('You are not authorized to view these assets. Please log in again.');
           // AuthContext and ProtectedRoute should ideally handle redirection
-        } 
+        }
         else {
           const errorData = await response.json();
           setError(errorData.message || 'Failed to fetch assets.');
@@ -286,7 +280,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
             fetchAllVulnerabilities();
         }
     }
-    
+
   }, [isAuthenticated, authIsLoading]); // Added allVulnerabilities and allVulnerabilitiesLoading to dependencies if fetched here
 
   if (authIsLoading) {
@@ -300,7 +294,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
   if (error) {
     return <div className="text-center py-10 text-red-500">Error: {error}</div>;
   }
-  
+
   // This case should be handled by ProtectedRoute, but as a fallback:
   if (!isAuthenticated) {
       return <div className="text-center py-10">Please log in to view assets.</div>;
@@ -331,7 +325,6 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Operating System</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Scanned</th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
@@ -343,11 +336,8 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{asset.type}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{asset.ipAddress}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{asset.operatingSystem || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {asset.lastScannedAt ? format(new Date(asset.lastScannedAt), 'Pp') : 'N/A'}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                      <Button 
+                      <Button
                         onClick={() => handleToggleVulnerabilities(asset.id)}
                         className="text-xs px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white"
                       >
@@ -360,7 +350,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                   </tr>
                   {expandedAssetId === asset.id && (
                     <tr>
-                      <td colSpan={6} className="p-0"> {/* Remove padding from td to allow inner div to control it, colspan updated */}
+                      <td colSpan={5} className="p-0"> {/* Remove padding from td to allow inner div to control it */}
                         <div className="px-4 py-4 bg-gray-100">
                           {vulnerabilityLoading[asset.id] && <p className="text-sm text-gray-600">Loading vulnerabilities...</p>}
                           {vulnerabilityError[asset.id] && <p className="text-sm text-red-500">Error: {vulnerabilityError[asset.id]}</p>}
@@ -373,7 +363,6 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                                     <tr>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Name</th>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Severity</th>
-                                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Source</th>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Status</th>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Last Seen</th>
                                     </tr>
@@ -384,7 +373,6 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                                         <tr className="hover:bg-gray-50">
                                           <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-800">{link.vulnerability?.name || 'N/A'}</td>
                                           <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600">{link.vulnerability?.severity || 'N/A'}</td>
-                                          <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{link.vulnerability?.source || 'N/A'}</td>
                                           <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-600">
                                             <select
                                               value={link.status}
@@ -403,7 +391,7 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                                         </tr>
                                         {updateStatusError[link.joinId] && (
                                             <tr>
-                                                <td colSpan={5} className="px-4 py-1 text-xs text-red-600 text-center"> {/* Colspan updated */}
+                                                <td colSpan={4} className="px-4 py-1 text-xs text-red-600 text-center">
                                                     Error updating status: {updateStatusError[link.joinId]}
                                                 </td>
                                             </tr>
@@ -451,18 +439,22 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
                             )}
                           </div>
 
-                          {/* Section to Scan Asset */}
+                          {/* Section for Simulate Scan */}
                           <div className="mt-6 pt-4 border-t border-gray-300">
                             <h5 className="text-md font-semibold text-gray-700 mb-3">Asset Actions</h5>
                             <Button
-                              onClick={() => handleScanAsset(asset.id)}
+                              onClick={() => handleSimulateScan(asset.id)}
                               disabled={scanLoading[asset.id]}
                               className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm"
                             >
-                              {scanLoading[asset.id] ? 'Scanning...' : 'Scan Asset'}
+                              {scanLoading[asset.id] ? 'Scanning...' : 'Simulate Scan'}
                             </Button>
+                            {scanLoading[asset.id] && <p className="text-xs text-gray-500 mt-1">Scan in progress...</p>}
                             {scanError[asset.id] && (
-                              <p className="text-xs text-red-500 mt-1">{scanError[asset.id]}</p>
+                              <p className="text-xs text-red-500 mt-1">Scan Error: {scanError[asset.id]}</p>
+                            )}
+                            {scanSuccessMessage[asset.id] && (
+                              <p className="text-xs text-green-600 mt-1">{scanSuccessMessage[asset.id]}</p>
                             )}
                           </div>
                         </div>
