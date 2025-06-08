@@ -57,8 +57,7 @@ const RecentAssetsWidget: React.FC<RecentAssetsWidgetProps> = ({ assets, isLoadi
                 {assets.map(asset => (
                   <TableRow key={asset.id}>
                     <TableCell className="font-medium">
-                      {/* Link to individual asset page if available, e.g., /assets/${asset.id} */}
-                      <Link href={`/assets`} className="hover:underline text-primary">
+                      <Link href={`/assets/${asset.id}`} className="hover:underline text-primary">
                         {asset.name}
                       </Link>
                     </TableCell>

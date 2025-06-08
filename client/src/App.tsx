@@ -4,11 +4,12 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
-import AssetsPage from './pages/AssetsPage'; // Import AssetsPage
-import AddAssetPage from './pages/AddAssetPage'; // Import AddAssetPage
-import EditAssetPage from './pages/EditAssetPage'; // Import EditAssetPage
+import AssetsPage from './pages/AssetsPage';
+import AddAssetPage from './pages/AddAssetPage';
+import EditAssetPage from './pages/EditAssetPage';
+import AssetDetailsPage from './pages/AssetDetailsPage'; // Import AssetDetailsPage
 import ProtectedRoute from './components/ProtectedRoute';
-import Button from './components/ui/Button'; // For the logout button
+import Button from './components/ui/Button';
 
 // AppContent will contain the navigation and routing logic,
 // and can use the useAuth hook because it's a child of AuthProvider.
@@ -89,12 +90,12 @@ const AppContent: React.FC = () => {
             </ProtectedRoute>
           </Route>
           <Route path="/assets/edit/:assetId">
-            {(params) => ( // Wouter provides params directly to children function if path matches
-              <ProtectedRoute>
-                <EditAssetPage />
-                {/* EditAssetPage uses useRoute to get assetId, so no need to pass params explicitly here */}
-              </ProtectedRoute>
-            )}
+            {/* EditAssetPage uses useRoute to get assetId */}
+            <ProtectedRoute><EditAssetPage /></ProtectedRoute>
+          </Route>
+          <Route path="/assets/:assetId">
+            {/* AssetDetailsPage uses useRoute to get assetId */}
+            <ProtectedRoute><AssetDetailsPage /></ProtectedRoute>
           </Route>
           <Route path="/">
             {isLoading ? (

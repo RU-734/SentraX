@@ -21,10 +21,9 @@ interface RecentVulnerabilityInstance {
   vulnerabilityName: string;
   vulnerabilitySeverity: string;
   assetName: string;
-  assetIpAddress: string; // Available if needed, not explicitly requested for display here
+  assetIpAddress: string;
   lastSeenOrUpdatedAt: string;
-  // assetId is not directly in this flat structure from backend,
-  // but assetName implies an asset. Link will go to general /assets for now.
+  assetId: number; // Added assetId
 }
 
 interface RecentVulnerabilitiesWidgetProps {
@@ -76,9 +75,14 @@ const RecentVulnerabilitiesWidget: React.FC<RecentVulnerabilitiesWidgetProps> = 
                       {vuln.vulnerabilitySeverity || 'N/A'}
                     </TableCell>
                     <TableCell>
-                      <Link href={`/assets`} className="hover:underline text-primary">
-                        {vuln.assetName}
-                      </Link>
+                      {/* Ensure vuln.assetId is available before creating the link */}
+                      {vuln.assetId ? (
+                        <Link href={`/assets/${vuln.assetId}`} className="hover:underline text-primary">
+                          {vuln.assetName}
+                        </Link>
+                      ) : (
+                        <span>{vuln.assetName}</span> // Fallback if assetId is somehow not available
+                      )}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {new Date(vuln.lastSeenOrUpdatedAt).toLocaleDateString()}

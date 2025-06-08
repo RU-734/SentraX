@@ -33,6 +33,7 @@ interface RecentVulnerabilityInstance {
   assetName: string;
   assetIpAddress: string;
   lastSeenOrUpdatedAt: string;
+  assetId: number; // Added assetId
 }
 
 const DashboardPage: React.FC = () => {

@@ -332,7 +332,11 @@ const vulnerabilityStatusEnumValues: LinkedVulnerability['status'][] = [
               {assets.map((asset) => (
                 <Fragment key={asset.id}>
                   <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{asset.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <Link href={`/assets/${asset.id}`} className="text-indigo-600 hover:text-indigo-800 hover:underline">
+                        {asset.name}
+                      </Link>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{asset.type}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{asset.ipAddress}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{asset.operatingSystem || 'N/A'}</td>
